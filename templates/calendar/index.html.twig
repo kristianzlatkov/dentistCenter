@@ -1,0 +1,96 @@
+{% extends 'layout.html.twig' %}
+
+{% block title %}Calendar{% endblock %}
+
+{% block content %}
+    <div class="text-center mb-3">
+        <button type="button" class="btn btn-primary" id="makeAppointmentBtn">
+            Make appointment
+        </button>
+    </div>
+
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var calendarEl = document.getElementById('calendar');
+
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                height: 650,
+                timeZone: 'Helsinki', // Set the timezone explicitly
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+                events: {{ appointments|raw }},
+                // Add event click listener to open modal for adding new event
+                dateClick: function(info) {
+                    // Extract the clicked date and time
+                    var clickedDate = info.date;
+                    var clickedHour = clickedDate.getHours()-2;
+                    clickedHour = clickedHour.toString().padStart(2, '0');
+                    var clickedMinute = clickedDate.getMinutes().toString().padStart(2, '0');
+                    document.getElementById('start').value = clickedDate.toISOString().slice(0, 10) + 'T' + clickedHour + ':' + clickedMinute;
+
+                    // Reset the form fields
+                    document.getElementById('name').value = '';
+                    document.getElementById('email').value = '';
+                    document.getElementById('phone_number').value = '';
+                    document.getElementById('appointment_id').value = ''; // Reset the appointment ID
+
+                    // Show the modal for making a new appointment
+                    $('#addAppointmentModal').modal('show');
+                },
+                eventClick: function(info) {
+                    // Send a GET request to retrieve event details
+                    var eventId = info.event.id;
+                    fetch(`/appointments/${eventId}`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Failed to retrieve event details');
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            // Populate the modal form with event details for editing
+                            document.getElementById('name').value = data.title;
+                            document.getElementById('start').value = data.start;
+                            document.getElementById('end').value = data.end;
+                            document.getElementById('email').value = data.email_address || ''; // Check if email exists, otherwise set empty string
+                            document.getElementById('phone_number').value = data.phone_number || ''; // Check if phone number exists, otherwise set empty string
+                            document.getElementById('appointment_id').value = eventId; // Set the appointment ID
+
+                            // Show the modal for editing
+                            $('#addAppointmentModal').modal('show');
+                        })
+                        .catch(error => {
+                            console.error('Error retrieving event details:', error);
+                            alert('Failed to retrieve event details. Please try again.');
+                        });
+                }
+            });
+            calendar.render();
+            // Function to open the modal when the button is clicked
+            document.getElementById('makeAppointmentBtn').addEventListener('click', function() {
+                // Reset the form fields
+                document.getElementById('name').value = '';
+                document.getElementById('start').value = '';
+                document.getElementById('end').value = '';
+                document.getElementById('email').value = '';
+                document.getElementById('phone_number').value = '';
+                document.getElementById('appointment_id').value = ''; // Reset the appointment ID
+
+                $('#addAppointmentModal').modal('show');
+            });
+        });
+
+    </script>
+    {% include '/calendar/AddAppointmentModal.html.twig' %}
+    <div id='calendar'></div>
+{% endblock %}

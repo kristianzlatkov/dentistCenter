@@ -1,0 +1,210 @@
+{% block content %}
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Function to open the modal when the button is clicked
+            document.getElementById('makeAppointmentBtn').addEventListener('click', function() {
+                // Reset the form fields
+                document.getElementById('name').value = '';
+                document.getElementById('start').value = '';
+                document.getElementById('end').value = '';
+                document.getElementById('email').value = '';
+                document.getElementById('phone_number').value = '';
+                document.getElementById('appointment_id').value = ''; // Reset the appointment ID
+
+                // Disable the delete button
+                document.getElementById('deleteAppointmentBtn').disabled = true;
+
+                $('#addAppointmentModal').modal('show');
+            });
+
+            // Set the minimum date and time for the datetime-local input fields
+            var now = new Date();
+            var currentDate = now.toISOString().slice(0, 10); // Get current date in YYYY-MM-DD format
+            var currentTime = now.toTimeString().slice(0, 5); // Get current time in HH:mm format
+            document.getElementById('start').min = currentDate + 'T' + currentTime;
+            document.getElementById('end').min = currentDate + 'T' + currentTime;
+
+            // Function to handle form submission
+            document.getElementById('saveAppointmentBtn').addEventListener('click', function() {
+                // Get form data
+                var title = document.getElementById('name').value.trim();
+                var start = document.getElementById('start').value.trim();
+                var end = document.getElementById('end').value.trim();
+                var email = document.getElementById('email').value.trim();
+                var phoneNumber = document.getElementById('phone_number').value.trim();
+                var appointmentId = document.getElementById('appointment_id').value; // Get the appointment ID
+
+                // Validate form fields
+                if (title === '') {
+                    alert('Please enter a name for the appointment.');
+                    return; // Stop further execution
+                }
+
+                if (start === '' || end === '') {
+                    alert('Please select start and end dates for the appointment.');
+                    return; // Stop further execution
+                }
+
+                // Validate email address format
+                var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    alert('Please enter a valid email address.');
+                    return; // Stop further execution
+                }
+
+                // Validate phone number format
+                var phoneRegex = /^\d{10}$/;
+                if (!phoneRegex.test(phoneNumber)) {
+                    alert('Please enter a valid phone number (10 digits).');
+                    return; // Stop further execution
+                }
+
+                // Check if end date/time is before start date/time
+                if (new Date(end) < new Date(start)) {
+                    alert('End date/time cannot be before start date/time.');
+                    return; // Stop further execution
+                }
+
+                // Check if start time is before current time
+                if (new Date(start) < now) {
+                    alert('Start time cannot be in the past.');
+                    return; // Stop further execution
+                }
+
+                // Create a new FormData object and append form data
+                var formData = new FormData();
+                formData.append('title', title);
+                formData.append('start', start);
+                formData.append('end', end);
+                formData.append('email_address', email);
+                formData.append('phone_number', phoneNumber);
+                formData.append('id', appointmentId); // Append the appointment ID
+
+                // Send form data to '/appointments' route using POST method
+                fetch('/appointments', {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(response => {
+                        if (response.ok) {
+                            $('#addAppointmentModal').modal('hide');
+                            alert('Successfully saved appointment.');
+                            location.reload(); // Refresh the page to reload the calendar
+                        } else {
+                            // Handle error response
+                            return response.json().then(data => {
+                                alert('Failed to save an appointment: ' + data.error);
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error saving appointment:', error);
+                        alert('Failed to save an appointment. Please try again.');
+                    });
+            });
+
+            // Function to handle delete button click
+            document.getElementById('deleteAppointmentBtn').addEventListener('click', function() {
+                var appointmentId = document.getElementById('appointment_id').value;
+
+                if (appointmentId) {
+                    if (confirm('Are you sure you want to delete this appointment?')) {
+                        // Send a DELETE request to delete the appointment
+                        fetch(`/appointments/${appointmentId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        })
+                            .then(response => {
+                                if (response.ok) {
+                                    $('#addAppointmentModal').modal('hide');
+                                    alert('Successfully deleted appointment.');
+                                    location.reload(); // Refresh the page to reload the calendar
+                                } else {
+                                    // Handle error response
+                                    alert('Failed to delete appointment.');
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error deleting appointment:', error);
+                                alert('Failed to delete appointment. Please try again.');
+                            });
+                    }
+                } else {
+                    alert('No appointment selected.');
+                }
+            });
+
+            // Function to enable or disable the delete button based on the presence of an appointment ID
+            function toggleDeleteButton() {
+                var appointmentId = document.getElementById('appointment_id').value;
+                var deleteButton = document.getElementById('deleteAppointmentBtn');
+
+                // Enable or disable the delete button based on whether an appointment ID is set
+                deleteButton.disabled = !appointmentId;
+                if (appointmentId) {
+                    deleteButton.classList.remove('disabled-button');
+                } else {
+                    deleteButton.classList.add('disabled-button');
+                }
+            }
+
+            // Call the toggleDeleteButton function when the modal is shown
+            $('#addAppointmentModal').on('shown.bs.modal', toggleDeleteButton);
+
+            // Call the toggleDeleteButton function when the appointment ID field changes
+            document.getElementById('appointment_id').addEventListener('change', toggleDeleteButton);
+        });
+    </script>
+
+    <!-- Modal markup -->
+    <div class="modal fade" id="addAppointmentModal" tabindex="-1" role="dialog" aria-labelledby="addAppointmentModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addAppointmentModalLabel">Make an appointment!</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <!-- Form for adding/editing appointment -->
+                    <form id="addAppointmentForm">
+                        <!-- Hidden input field to store the appointment ID -->
+                        <input type="hidden" id="appointment_id" name="appointment_id" value="">
+                        <div class="form-group">
+                            <label for="name">Name</label>
+                            <input type="text" class="form-control" id="name" name="name">
+                        </div>
+                        <div class="form-group">
+                            <label for="start">Start</label>
+                            <input type="datetime-local" class="form-control" id="start" name="start">
+                        </div>
+                        <div class="form-group">
+                            <label for="end">End</label>
+                            <input type="datetime-local" class="form-control" id="end" name="end">
+                        </div>
+                        <div class="form-group">
+                            <label for="email">Email Address</label>
+                            <input type="email" class="form-control" id="email" name="email">
+                        </div>
+                        <div class="form-group">
+                            <label for="phone_number">Phone Number</label>
+                            <input type="tel" class="form-control" id="phone_number" name="phone_number">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-danger disabled-button" id="deleteAppointmentBtn" disabled>Delete</button>
+                    <button type="button" class="btn btn-primary" id="saveAppointmentBtn">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar -->
+    <div id='calendar'></div>
+{% endblock %}
